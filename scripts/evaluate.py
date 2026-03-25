@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Batch evaluation script for LLM Gateway.
+"""Скрипт пакетной оценки для LLM-шлюза.
 
-Usage:
+Использование:
     python scripts/evaluate.py [--gateway-url URL] [--prompts-file FILE]
 
-Sends test prompts to the gateway, evaluates responses quality,
-and logs aggregate metrics to MLFlow.
+Отправляет тестовые промпты в шлюз, оценивает качество ответов
+и записывает агрегированные метрики в MLFlow.
 """
 import argparse
 import json
@@ -15,7 +15,7 @@ import time
 
 import httpx
 
-# Use our gateway's evaluation module
+# Используем модуль оценки шлюза
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from gateway.app.evaluation import evaluate_response
 
@@ -39,7 +39,7 @@ def get_token(base_url: str, username: str = "admin", password: str = "admin") -
 
 
 def send_prompt(base_url: str, token: str, prompt: str) -> tuple[str, float]:
-    """Send prompt and return (response_text, latency_ms)."""
+    """Отправляет промпт и возвращает (текст_ответа, задержка_мс)."""
     t0 = time.time()
     resp = httpx.post(
         f"{base_url}/v1/chat/completions",
@@ -67,7 +67,7 @@ def main():
         with open(args.prompts_file) as f:
             prompts = json.load(f)
 
-    print(f"Evaluating {len(prompts)} prompts → {args.gateway_url}")
+    print(f"Оцениваем {len(prompts)} промптов -> {args.gateway_url}")
     print("=" * 60)
 
     token = get_token(args.gateway_url)
@@ -80,15 +80,15 @@ def main():
             results.append(ev)
 
             print(f"\n[{i}/{len(prompts)}] {prompt[:55]}...")
-            print(f"  Length    : {ev.response_length} chars")
-            print(f"  Structured: {ev.has_structure}")
-            print(f"  Relevance : {ev.relevance_score:.3f}")
-            print(f"  Latency   : {ev.latency_ms:.0f} ms")
+            print(f"  Длина       : {ev.response_length} симв.")
+            print(f"  Структура   : {ev.has_structure}")
+            print(f"  Релевантность: {ev.relevance_score:.3f}")
+            print(f"  Задержка    : {ev.latency_ms:.0f} мс")
         except Exception as exc:
-            print(f"\n[{i}/{len(prompts)}] FAILED: {exc}")
+            print(f"\n[{i}/{len(prompts)}] ОШИБКА: {exc}")
 
     if not results:
-        print("\nNo successful evaluations.")
+        print("\nУспешных оценок нет.")
         return
 
     avg_len = sum(r.response_length for r in results) / len(results)
@@ -97,14 +97,14 @@ def main():
     struct_rate = sum(1 for r in results if r.has_structure) / len(results)
 
     print("\n" + "=" * 60)
-    print("AGGREGATE RESULTS")
-    print(f"  Evaluated      : {len(results)}/{len(prompts)}")
-    print(f"  Avg length     : {avg_len:.0f} chars")
-    print(f"  Avg latency    : {avg_lat:.0f} ms")
-    print(f"  Avg relevance  : {avg_rel:.3f}")
-    print(f"  Structure rate : {struct_rate:.1%}")
+    print("ИТОГОВЫЕ РЕЗУЛЬТАТЫ")
+    print(f"  Оценено        : {len(results)}/{len(prompts)}")
+    print(f"  Средняя длина  : {avg_len:.0f} симв.")
+    print(f"  Средняя задержка: {avg_lat:.0f} мс")
+    print(f"  Средняя релев. : {avg_rel:.3f}")
+    print(f"  Доля структур. : {struct_rate:.1%}")
 
-    # Log to MLFlow
+    # Логирование в MLFlow
     try:
         import mlflow
 
@@ -120,9 +120,9 @@ def main():
                 "structure_rate": struct_rate,
                 "num_prompts": float(len(results)),
             })
-        print(f"\nMetrics logged to MLFlow at {mlflow_uri}")
+        print(f"\nМетрики записаны в MLFlow: {mlflow_uri}")
     except Exception as exc:
-        print(f"\nMLFlow logging skipped (non-critical): {exc}")
+        print(f"\nЗапись в MLFlow пропущена (некритично): {exc}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Integration tests for the LLM Gateway."""
+"""Интеграционные тесты LLM-шлюза."""
 import os
 
 import httpx
@@ -71,7 +71,7 @@ class TestChatCompletions:
             assert "injection" in resp.json()["detail"].lower()
 
     async def test_load_balancing_uses_provider(self, auth_headers):
-        """All requests succeed and return X-Provider header."""
+        """Все запросы успешны и возвращают заголовок X-Provider."""
         async with httpx.AsyncClient(base_url=GATEWAY_URL, timeout=30.0) as client:
             for _ in range(4):
                 resp = await client.post(

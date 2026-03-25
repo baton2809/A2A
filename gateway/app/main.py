@@ -52,7 +52,7 @@ async def on_startup() -> None:
     for p_data in cfg.initial_providers():
         provider = LLMProvider(**p_data)
         await store.add(provider)
-        log.info("Провайдер зарегистрирован: %s → %s (weight=%d)", provider.name, provider.url, provider.weight)
+        log.info("Провайдер зарегистрирован: %s -> %s (weight=%d)", provider.name, provider.url, provider.weight)
 
     asyncio.create_task(watch_providers())
     log.info("LLM Gateway v2 запущен (auth + guardrails enabled)")

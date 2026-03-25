@@ -1,4 +1,4 @@
-"""A2A Agent Card data models."""
+"""Модели данных A2A Agent Card."""
 from pydantic import BaseModel, Field
 
 

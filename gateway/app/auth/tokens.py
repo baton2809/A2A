@@ -1,4 +1,4 @@
-"""JWT token utilities: creation and verification."""
+"""Утилиты JWT-токенов: создание и верификация."""
 import datetime
 import os
 
@@ -20,5 +20,5 @@ def issue_token(username: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Decode and verify JWT. Raises jwt.PyJWTError on failure."""
+    """Декодирует и верифицирует JWT. Выбрасывает jwt.PyJWTError при ошибке."""
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

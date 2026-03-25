@@ -1,4 +1,4 @@
-"""Redis-backed agent registry with in-memory fallback and skill/tag search."""
+"""Реестр агентов с Redis и in-memory резервом, поиском по навыкам и тегам."""
 import logging
 import os
 
@@ -103,5 +103,5 @@ class AgentRegistry:
         return result
 
 
-# Singleton
+# Синглтон
 registry = AgentRegistry()

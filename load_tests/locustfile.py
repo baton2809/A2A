@@ -1,31 +1,31 @@
-"""Locust load tests for LLM Gateway.
+"""Нагрузочные тесты LLM-шлюза (Locust).
 
-Three user classes implement the three scenarios required by Level 3:
+Три класса пользователей реализуют сценарии, необходимые для уровня 3:
 
-  GatewayUser         — baseline concurrent load (non-stream + stream mix)
-  ProviderFailureUser — registers a broken provider, sends traffic while one
-                        provider is unavailable, verifies failover works
-  PeakLoadUser        — zero wait time, fires as fast as possible (peak/spike)
+  GatewayUser         — базовая конкурентная нагрузка (смесь stream и non-stream)
+  ProviderFailureUser — регистрирует сломанный провайдер, отправляет трафик пока
+                        один провайдер недоступен, проверяет работу failover
+  PeakLoadUser        — нулевое время ожидания, максимально быстрые запросы (spike)
 
-Usage:
+Использование:
     pip install locust
-    # Interactive web UI (http://localhost:8089):
+    # Интерактивный веб-интерфейс (http://localhost:8089):
     locust -f load_tests/locustfile.py --host http://localhost:8080
 
-    # Headless — baseline 20 users for 60s:
+    # Без интерфейса — базовые 20 пользователей на 60с:
     locust -f load_tests/locustfile.py --host http://localhost:8080 \
            --headless -u 20 -r 5 --run-time 60s \
            --csv load_tests/results/baseline
 
-    # Peak load 50 users, spawn 50/s:
+    # Пиковая нагрузка 50 пользователей, spawn 50/с:
     locust -f load_tests/locustfile.py --host http://localhost:8080 \
            --headless -u 50 -r 50 --run-time 30s \
            --csv load_tests/results/peak \
-           --class-picker  # pick PeakLoadUser only
+           --class-picker  # выбрать только PeakLoadUser
 
-Environment variables:
-    GATEWAY_USER   (default: admin)
-    GATEWAY_PASS   (default: admin)
+Переменные окружения:
+    GATEWAY_USER   (по умолчанию: admin)
+    GATEWAY_PASS   (по умолчанию: admin)
 """
 import os
 import random
@@ -50,7 +50,7 @@ _PROMPTS = [
 
 
 def _auth(client) -> str:
-    """Obtain JWT token. Returns empty string on failure."""
+    """Получает JWT-токен. При ошибке возвращает пустую строку."""
     with client.post(
         "/auth/token",
         json={"username": _USER, "password": _PASS},
@@ -65,13 +65,13 @@ def _auth(client) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Scenario 1: Baseline concurrent load
+# Сценарий 1: Базовая конкурентная нагрузка
 # ---------------------------------------------------------------------------
 
 class GatewayUser(HttpUser):
-    """Normal concurrent users — mix of streaming and non-streaming requests.
+    """Обычные пользователи — сочетание потоковых и обычных запросов.
 
-    Measures: throughput (req/s), p50/p95 latency, error rate.
+    Измеряет: пропускную способность (req/s), задержку p50/p95, долю ошибок.
     """
 
     wait_time = between(0.5, 2.0)
@@ -84,7 +84,7 @@ class GatewayUser(HttpUser):
 
     @task(6)
     def chat_non_stream(self):
-        """Non-streaming completion — most common production pattern."""
+        """Обычный запрос — наиболее частый сценарий."""
         with self.client.post(
             "/v1/chat/completions",
             json={
@@ -103,7 +103,7 @@ class GatewayUser(HttpUser):
 
     @task(3)
     def chat_stream(self):
-        """Streaming completion — reads full SSE stream before completing."""
+        """Потоковый запрос — читает весь SSE-поток до конца."""
         with self.client.post(
             "/v1/chat/completions",
             json={
@@ -117,8 +117,8 @@ class GatewayUser(HttpUser):
             name="POST /v1/chat/completions [stream]",
         ) as resp:
             if resp.status_code == 200:
-                # Consume entire SSE stream — verifies connection is not dropped
-                # iter_lines() may yield bytes or str depending on locust version
+                # Читаем весь SSE-поток — проверяем, что соединение не обрывается
+                # iter_lines() может возвращать bytes или str в зависимости от версии locust
                 chunks = 0
                 for raw in resp.iter_lines():
                     line = raw.decode() if isinstance(raw, bytes) else raw
@@ -141,23 +141,23 @@ class GatewayUser(HttpUser):
 
 
 # ---------------------------------------------------------------------------
-# Scenario 2: Provider failure + automatic failover
+# Сценарий 2: Отказ провайдера + автоматический failover
 # ---------------------------------------------------------------------------
 
 class ProviderFailureUser(HttpUser):
-    """Registers a broken provider, then sends requests.
+    """Регистрирует сломанный провайдер, затем отправляет запросы.
 
-    Verifies:
-    - Circuit breaker opens after repeated 5xx errors
-    - Gateway automatically fails over to healthy provider
-    - No request reaches the client as an error (failover is transparent)
+    Проверяет:
+    - Circuit breaker открывается после повторных ошибок 5xx
+    - Шлюз автоматически переключается на работоспособный провайдер
+    - Ни один запрос не достигает клиента как ошибка (failover прозрачен)
     """
 
     wait_time = between(1.0, 3.0)
 
     def on_start(self):
         self._token = _auth(self.client)
-        # Register a broken provider (nothing listens on port 19999)
+        # Регистрируем сломанный провайдер (никто не слушает порт 19999)
         with self.client.post(
             "/providers",
             json={
@@ -170,10 +170,10 @@ class ProviderFailureUser(HttpUser):
             catch_response=True,
             name="POST /providers [setup broken]",
         ) as resp:
-            resp.success()  # ignore result, provider may already exist
+            resp.success()  # игнорируем результат, провайдер может уже существовать
 
     def on_stop(self):
-        # Cleanup
+        # Очистка
         self.client.delete(
             "/providers/broken-provider",
             headers={"Authorization": f"Bearer {self._token}"},
@@ -182,7 +182,7 @@ class ProviderFailureUser(HttpUser):
 
     @task
     def chat_with_failover(self):
-        """Request should succeed via failover even though broken provider exists."""
+        """Запрос должен успешно завершиться через failover."""
         with self.client.post(
             "/v1/chat/completions",
             json={
@@ -197,20 +197,20 @@ class ProviderFailureUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code == 502:
-                # All providers exhausted — acceptable only briefly during CB opening
-                resp.failure("All providers down (circuit breaker not fast enough)")
+                # Все провайдеры исчерпаны — допустимо лишь на короткое время при открытии CB
+                resp.failure("Все провайдеры недоступны (circuit breaker не успел открыться)")
             else:
                 resp.failure(f"Unexpected HTTP {resp.status_code}")
 
 
 # ---------------------------------------------------------------------------
-# Scenario 3: Peak load (spike)
+# Сценарий 3: Пиковая нагрузка (spike)
 # ---------------------------------------------------------------------------
 
 class PeakLoadUser(HttpUser):
-    """Hammers the gateway with no wait time to simulate traffic spike.
+    """Атакует шлюз без задержек для имитации пикового трафика.
 
-    Measures: maximum throughput, latency under saturation, error rate at peak.
+    Измеряет: максимальную пропускную способность, задержку при насыщении, долю ошибок в пике.
     """
 
     wait_time = constant(0)
@@ -232,18 +232,18 @@ class PeakLoadUser(HttpUser):
             name="POST /v1/chat/completions [peak]",
         ) as resp:
             if resp.status_code in (200, 503):
-                # 503 = all providers busy is acceptable under extreme load
+                # 503 = все провайдеры заняты — допустимо при экстремальной нагрузке
                 resp.success()
             else:
                 resp.failure(f"HTTP {resp.status_code}")
 
 
 # ---------------------------------------------------------------------------
-# Scenario 4: Guardrail stress — injection attacks
+# Сценарий 4: Стресс-тест guardrail — атаки инъекций
 # ---------------------------------------------------------------------------
 
 class InjectionAttackUser(HttpUser):
-    """Verifies guardrails hold under concurrent injection attempts."""
+    """Проверяет устойчивость guardrail под конкурентными атаками."""
 
     wait_time = between(1.0, 3.0)
 
@@ -270,7 +270,7 @@ class InjectionAttackUser(HttpUser):
             catch_response=True,
             name="POST /v1/chat/completions [injection]",
         ) as resp:
-            # Guardrail must return 400
+            # Guardrail должен вернуть 400
             if resp.status_code == 400:
                 resp.success()
             else:

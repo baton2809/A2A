@@ -1,11 +1,11 @@
-"""Security scanner: prompt injection detection and secret leakage prevention.
+"""Сканер безопасности: обнаружение prompt-инъекций и утечек секретов.
 
-Both checks live in one module to keep the guardrail logic cohesive.
+Оба вида проверок находятся в одном модуле для согласованности логики guardrail.
 """
 import re
 
 # ---------------------------------------------------------------------------
-# Prompt injection patterns
+# Паттерны prompt-инъекций
 # ---------------------------------------------------------------------------
 _INJECTION_RULES = [
     r"ignore\s+(all\s+)?(previous|prior)\s+instructions",
@@ -13,8 +13,8 @@ _INJECTION_RULES = [
     r"forget\s+(everything|all\s+previous|all\s+prior)",
     r"override\s+(your\s+)?instructions",
     r"you\s+are\s+now\s+(?:a|an)\s+\w+",
-    r"act\s+as\s+(?:a|an)\s+\w+",                         # broader: act as a/an X
-    r"without\s+restrictions",                             # catch "unrestricted" patterns
+    r"act\s+as\s+(?:a|an)\s+\w+",                         # шире: act as a/an X
+    r"without\s+restrictions",                             # ловим "unrestricted" паттерны
     r"unrestricted\s+(?:ai|mode|assistant)",
     r"pretend\s+(?:you(?:'re|\s+are)\s+)",
     r"reveal\s+(?:your\s+)?system\s+prompt",
@@ -31,7 +31,7 @@ _injection_re = [re.compile(p, re.IGNORECASE) for p in _INJECTION_RULES]
 
 
 def detect_injection(text: str) -> str | None:
-    """Return the matched injection phrase, or None if clean."""
+    """Возвращает совпавший паттерн инъекции или None если текст чистый."""
     for pattern in _injection_re:
         m = pattern.search(text)
         if m:
@@ -40,7 +40,7 @@ def detect_injection(text: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Secret leakage patterns
+# Паттерны утечки секретов
 # ---------------------------------------------------------------------------
 _SECRET_RULES: list[tuple[str, str]] = [
     (r"(?:sk|pk)-[a-zA-Z0-9]{32,}", "OpenAI/Stripe API key"),
@@ -57,7 +57,7 @@ _secret_re = [(re.compile(p, re.IGNORECASE), label) for p, label in _SECRET_RULE
 
 
 def detect_secrets(text: str) -> list[str]:
-    """Return list of detected secret type names found in text."""
+    """Возвращает список типов найденных секретов в тексте."""
     found = []
     for pattern, label in _secret_re:
         if pattern.search(text):

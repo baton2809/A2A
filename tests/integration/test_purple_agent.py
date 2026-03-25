@@ -1,4 +1,4 @@
-"""Integration tests for the Purple Agent."""
+"""Интеграционные тесты Purple Agent."""
 import os
 
 import httpx

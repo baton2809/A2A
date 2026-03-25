@@ -1,6 +1,6 @@
-"""JWT authentication middleware.
+"""Middleware аутентификации JWT.
 
-Intercepts every request except public paths and validates the Bearer token.
+Перехватывает все запросы, кроме публичных путей, и проверяет Bearer-токен.
 """
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .tokens import decode_token
 
-# Endpoints accessible without a token
+# Эндпоинты без аутентификации
 _PUBLIC = {"/health", "/auth/token", "/docs", "/openapi.json", "/redoc"}
 
 

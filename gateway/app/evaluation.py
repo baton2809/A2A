@@ -1,7 +1,6 @@
-"""Inline response quality evaluation.
+"""Инлайн-оценка качества ответа.
 
-Scores every LLM response on four dimensions and (optionally) ships
-the metrics to MLFlow for experiment tracking.
+Оценивает каждый LLM-ответ по четырём критериям и отправляет метрики в MLFlow.
 """
 import logging
 import re
@@ -12,12 +11,12 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class EvalResult:
-    response_length: int       # character count
-    has_structure: bool        # markdown headers / lists / code blocks present
-    latency_ms: float          # end-to-end request latency
-    relevance_score: float     # Jaccard similarity between prompt and response
-    tokens_in: int = 0         # prompt tokens
-    tokens_out: int = 0        # completion tokens
+    response_length: int       # количество символов
+    has_structure: bool        # наличие заголовков, списков, блоков кода
+    latency_ms: float          # сквозная задержка запроса
+    relevance_score: float     # сходство Жаккара между запросом и ответом
+    tokens_in: int = 0         # входящие токены
+    tokens_out: int = 0        # исходящие токены
     request_cost_usd: float = 0.0  # tokens_out * price_per_token
 
 
@@ -59,7 +58,7 @@ def log_to_mlflow(
     model: str,
     extra: dict | None = None,
 ) -> None:
-    """Best-effort MLFlow logging — never raises.
+    """Логирование в MLFlow без исключений.
 
     eval_result=None допустимо для streaming-запросов,
     когда качество ответа не оценивается — тогда передаётся extra dict с raw-метриками.

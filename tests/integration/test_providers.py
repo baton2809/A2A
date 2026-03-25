@@ -1,4 +1,4 @@
-"""Integration tests for provider management."""
+"""Интеграционные тесты управления провайдерами."""
 import os
 
 import httpx
@@ -14,12 +14,12 @@ class TestProviders:
             resp = await client.get("/providers", headers=auth_headers)
             assert resp.status_code == 200
             data = resp.json()
-            assert "items" in data          # our API uses "items", not "providers"
-            assert len(data["items"]) >= 2  # mock-fast and mock-slow
+            assert "items" in data          # API использует "items", а не "providers"
+            assert len(data["items"]) >= 2  # mock-fast и mock-slow
 
     async def test_register_and_delete_provider(self, auth_headers):
         async with httpx.AsyncClient(base_url=GATEWAY_URL) as client:
-            # Register
+            # Зарегистрировать
             resp = await client.post(
                 "/providers",
                 headers=auth_headers,
@@ -27,16 +27,16 @@ class TestProviders:
             )
             assert resp.status_code == 201
 
-            # Verify in list
+            # Проверить наличие в списке
             resp = await client.get("/providers", headers=auth_headers)
             names = [p["name"] for p in resp.json()["items"]]
             assert "test-provider" in names
 
-            # Delete
+            # Удалить
             resp = await client.delete("/providers/test-provider", headers=auth_headers)
             assert resp.status_code == 200
 
-            # Verify removed
+            # Проверить удаление
             resp = await client.get("/providers", headers=auth_headers)
             names = [p["name"] for p in resp.json()["items"]]
             assert "test-provider" not in names

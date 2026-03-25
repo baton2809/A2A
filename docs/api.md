@@ -99,7 +99,7 @@ data: [DONE]
 }
 ```
 
-#### `POST /providers` → `201`
+#### `POST /providers` -> `201`
 Зарегистрировать нового провайдера.
 
 | Field | Type | Default | Description |
@@ -116,7 +116,7 @@ data: [DONE]
 #### `GET /providers/{name}`
 Получить данные конкретного провайдера.
 
-#### `DELETE /providers/{name}` → `200`
+#### `DELETE /providers/{name}` -> `200`
 Удалить провайдера.
 
 ---
@@ -148,7 +148,7 @@ data: [DONE]
 #### `GET /agents/search?skill=code&tag=reasoning`
 Поиск агентов по навыку и тегу.
 
-#### `POST /agents` → `201`
+#### `POST /agents` -> `201`
 Зарегистрировать агента.
 
 ```json
@@ -172,7 +172,7 @@ data: [DONE]
 #### `GET /agents/{name}`
 Получить карточку агента.
 
-#### `DELETE /agents/{name}` → `200`
+#### `DELETE /agents/{name}` -> `200`
 Удалить агента.
 
 ---

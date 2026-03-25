@@ -1,4 +1,4 @@
-"""Integration tests for the Agent Registry."""
+"""Интеграционные тесты реестра агентов."""
 import os
 
 import httpx
@@ -31,25 +31,25 @@ class TestAgentRegistry:
             }
         }
         async with httpx.AsyncClient(base_url=REGISTRY_URL) as client:
-            # Create
+            # Создать
             resp = await client.post("/agents", json=agent_card)
             assert resp.status_code == 201
 
-            # Read
+            # Прочитать
             resp = await client.get("/agents/test-agent")
             assert resp.status_code == 200
             assert resp.json()["name"] == "test-agent"
 
-            # List
+            # Список
             resp = await client.get("/agents")
             assert resp.status_code == 200
             names = [a["name"] for a in resp.json()["agents"]]
             assert "test-agent" in names
 
-            # Delete
+            # Удалить
             resp = await client.delete("/agents/test-agent")
             assert resp.status_code == 200
 
-            # Verify deleted
+            # Проверить удаление
             resp = await client.get("/agents/test-agent")
             assert resp.status_code == 404

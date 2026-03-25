@@ -1,4 +1,4 @@
-"""A2A Agent Registry REST API."""
+"""REST API реестра A2A-агентов."""
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Query
 

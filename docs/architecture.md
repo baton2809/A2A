@@ -3,54 +3,54 @@
 ## Обзор системы
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                       LLM Agent Platform                            │
-│                                                                     │
-│  ┌──────────┐    JWT     ┌──────────────────────────────────────┐  │
-│  │  Client  │──────────►│           Gateway :8080               │  │
-│  │ (curl /  │           │  ┌────────────┐  ┌─────────────────┐ │  │
-│  │  Agent)  │◄──────────│  │  JWT Guard │  │   Guardrails    │ │  │
-│  └──────────┘  Response │  │(middleware)│  │ injection+secret│ │  │
-│                          │  └────────────┘  └─────────────────┘ │  │
-│  ┌──────────┐   A2A      │  ┌────────────────────────────────┐  │  │
-│  │ Purple   │──────────►│  │        RoutingEngine            │  │  │
-│  │ Agent    │           │  │   EMA latency + circuit breaker  │  │  │
-│  │ :8020    │           │  └───────┬───────────────┬──────────┘  │  │
-│  └──────────┘           └──────────┼───────────────┼─────────────┘  │
-│       │                            │               │                 │
-│  ┌────▼──────┐             ┌───────▼────┐  ┌──────▼──────┐        │
-│  │  Agent    │             │ mock-fast  │  │  mock-slow  │        │
-│  │ Registry  │             │  :9001     │  │  :9002      │        │
-│  │  :8010    │             └────────────┘  └─────────────┘        │
-│  └─────┬─────┘                                                     │
-│        │            ┌──────────────────────────────────────────┐   │
-│  ┌─────▼──────┐     │             Infrastructure               │   │
-│  │   Redis    │     │  OTel Collector:4317 → Prometheus:9090   │   │
-│  │  :6379     │     │  Grafana:3000          MLFlow:5050       │   │
-│  └────────────┘     └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
++---------------------------------------------------------------------+
+|                       LLM Agent Platform                            |
+|                                                                     |
+|  +----------+    JWT     +--------------------------------------+  |
+|  |  Client  |----------->|           Gateway :8080              |  |
+|  | (curl /  |           |  +------------+  +-----------------+ |  |
+|  |  Agent)  |<----------|  |  JWT Guard |  |   Guardrails    | |  |
+|  +----------+  Response |  |(middleware)|  | injection+secret| |  |
+|                          |  +------------+  +-----------------+ |  |
+|  +----------+   A2A      |  +--------------------------------+  |  |
+|  | Purple   |----------->|  |        RoutingEngine           |  |  |
+|  | Agent    |           |  |   EMA latency + circuit breaker |  |  |
+|  | :8020    |           |  +--------+---------------+--------+  |  |
+|  +----------+           +-----------+---------------+------------+  |
+|       |                             |               |               |
+|  +----+------+             +--------+---+  +--------+----+         |
+|  |  Agent    |             | mock-fast  |  |  mock-slow  |         |
+|  | Registry  |             |  :9001     |  |  :9002      |         |
+|  |  :8010    |             +------------+  +-------------+         |
+|  +-----+-----+                                                      |
+|        |            +------------------------------------------+   |
+|  +-----+------+     |             Infrastructure               |   |
+|  |   Redis    |     |  OTel Collector:4317 -> Prometheus:9090  |   |
+|  |  :6379     |     |  Grafana:3000          MLFlow:5050       |   |
+|  +------------+     +------------------------------------------+   |
++---------------------------------------------------------------------+
 ```
 
 ## Поток запроса
 
 ```
 Client
-  │
-  ▼
+  |
+  v
 [JWT Guard middleware]
-  └── нет/неверный токен → 401
+  -- нет/неверный токен -> 401
 
 [detect_injection(prompt)]
-  └── инъекция найдена → 400 + метрика guardrail/injection
+  -- инъекция найдена -> 400 + метрика guardrail/injection
 
 [RoutingEngine.pick(candidates)]
   1. Фильтр по имени модели (или "*")
   2. Исключить провайдеры в cooldown
   3. Новые (latency_ema == 0) идут первыми
-  4. Lowest EMA с tolerance ±10%
+  4. Lowest EMA с tolerance +-10%
   5. Fallback: ближайший к выходу из cooldown
 
-[httpx.AsyncClient → Provider /v1/chat/completions]
+[httpx.AsyncClient -> Provider /v1/chat/completions]
 
   stream=True:
     StreamingResponse (SSE pass-through)
@@ -60,7 +60,7 @@ Client
     TPOT = (now - first_token_at) / chunk_count
 
   stream=False:
-    detect_secrets(response) → редактировать если найдено
+    detect_secrets(response) -> редактировать если найдено
     evaluate_response(prompt, response, latency_ms)
     log_to_mlflow(eval_result, provider, model)
     JSONResponse
@@ -70,7 +70,7 @@ Client
 
 Балансировщик поддерживает SSE без разрыва соединений:
 
-- `httpx.AsyncClient` создаётся **внутри** генератора `_stream()`, а не снаружи.
+- `httpx.AsyncClient` создаётся внутри генератора `_stream()`, а не снаружи.
   Это критично: `async with client` закрывает клиент при выходе из блока, поэтому
   если создать клиент до `StreamingResponse` — соединение закроется раньше, чем
   FastAPI начнёт читать генератор.
@@ -90,62 +90,69 @@ curl -D - http://localhost:8080/v1/chat/completions ...
 ## Компоненты
 
 ### Gateway (port 8080)
+
 | Модуль | Файл | Назначение |
 |---|---|---|
 | JWT auth | `auth/tokens.py`, `auth/guard.py` | HS256, 60 мин TTL |
-| Guardrails | `guardrails/scanner.py` | 17 injection + 8 secret паттернов |
-| Routing | `routing/engine.py` | EMA + circuit breaker |
+| Guardrails | `guardrails/scanner.py` | 19 injection + 8 secret паттернов |
+| Routing | `routing/engine.py` | EMA + circuit breaker + priority |
 | Round-Robin | `routing/round_robin.py` | `itertools.count()` |
 | Weighted | `routing/weighted.py` | `random.choices(weights)` |
-| Provider store | `providers/store.py` | Redis + in-memory fallback |
+| Provider store | `providers/store.py` | Redis + in-memory fallback, RPM лимиты |
 | Health watcher | `providers/watcher.py` | Фоновый поллинг /healthz |
 | Evaluation | `evaluation.py` | Jaccard similarity, структура MD |
-| Metrics | `telemetry/metrics.py` | OTel SDK → Prometheus |
+| Metrics | `telemetry/metrics.py` | OTel SDK -> Prometheus |
 
 ### Circuit Breaker
+
 ```
-Closed ──(≥5 ошибок)──► Open (cooldown)
-  ▲                           │
-  │                    2^(n-5) × 60s (max 600s)
-  └──(200 OK ← /healthz)──────┘
+Closed --(>=5 ошибок)--> Open (cooldown)
+  ^                           |
+  |                    2^(n-5) x 60s (max 600s)
+  +---(200 OK <- /healthz)----+
 ```
+
 Параметры: threshold=5, base=60s, cap=600s, EMA alpha=0.2
 
 ### Agent Registry (port 8010)
+
 - CRUD для A2A Agent Card (`name`, `description`, `url`, `skills`, `tags`)
 - Поиск по `skill` (имя/описание) и `tag`
 - Фоновый health check каждые 30 секунд
 - Redis-backed, in-memory fallback
 
 ### Purple Agent (port 8020)
+
 - A2A `/tasks/send` (sync) + `/tasks/stream` (SSE)
 - JWT cache + автообновление при 401
-- Retry с backoff: 0.5s → 1.0s → 2.0s (max 3 попытки)
+- Retry с backoff: 0.5s -> 1.0s -> 2.0s (max 3 попытки)
 - Redis-backed task storage (TTL 1h)
 
 ## Стратегии балансировки — сравнение
 
 | Стратегия | Реализация | Плюсы | Минусы |
 |---|---|---|---|
-| **Round-Robin** | `itertools.count() % N` | Простота, равномерность | Игнорирует задержку и здоровье |
-| **Weighted** | `random.choices(weights)` | Управляемое распределение нагрузки | Статичный вес, нет адаптации к условиям |
-| **EMA Latency** | `latency_ema` α=0.2 | Адаптируется к реальной задержке | Медленная реакция на резкие изменения |
-| **Health-Aware** | Circuit breaker + EMA | Автоотключает сбойные, предпочитает быстрые | Сложнее в отладке |
+| Round-Robin | `itertools.count() % N` | Простота, равномерность | Игнорирует задержку и здоровье |
+| Weighted | `random.choices(weights)` | Управляемое распределение нагрузки | Статичный вес, нет адаптации |
+| EMA Latency | `latency_ema` alpha=0.2 | Адаптируется к реальной задержке | Медленная реакция на резкие изменения |
+| Priority | поле `priority` | Явный приоритет провайдера | Нужна ручная настройка |
+| Health-Aware | Circuit breaker + EMA | Автоотключает сбойные, предпочитает быстрые | Сложнее в отладке |
 
-**Используется в продакшне:** `RoutingEngine` — комбинирует все четыре стратегии.
+Используется в продакшне: `RoutingEngine` — комбинирует все пять стратегий.
 
-### Поведение при сбоях:
+### Поведение при сбоях
+
 ```
 Нормальная работа:
-  mock-fast (60ms EMA)  → ~85% запросов
-  mock-slow (350ms EMA) → ~15% запросов
+  mock-fast (60ms EMA)  -> ~85% запросов
+  mock-slow (350ms EMA) -> ~15% запросов
 
 После 5 ошибок mock-fast:
-  mock-fast → cooldown 60s
-  mock-slow → 100% запросов (нет разрыва для клиента)
+  mock-fast -> cooldown 60s
+  mock-slow -> 100% запросов (нет разрыва для клиента)
 
 После восстановления mock-fast:
-  EMA сбрасывается → 0 (новый провайдер имеет приоритет)
+  EMA сбрасывается -> 0 (новый провайдер имеет приоритет)
   Трафик постепенно возвращается
 ```
 

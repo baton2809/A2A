@@ -63,7 +63,7 @@ def init_telemetry() -> None:
         exporter = OTLPMetricExporter(endpoint=cfg.otel_endpoint, insecure=True)
         reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10_000)
         provider = MeterProvider(resource=resource, metric_readers=[reader])
-        log.info("OTel: экспорт метрик → %s", cfg.otel_endpoint)
+        log.info("OTel: экспорт метрик -> %s", cfg.otel_endpoint)
     except Exception as exc:
         log.warning("OTel collector недоступен (%s), метрики без экспорта", exc)
         provider = MeterProvider(resource=resource)

@@ -26,7 +26,7 @@ class ProviderStore:
     def __init__(self) -> None:
         self._redis: aioredis.Redis | None = None
         self._cache: dict[str, LLMProvider] = {}
-        # Скользящее окно RPM: имя провайдера → deque timestamp'ов запросов
+        # Скользящее окно RPM: имя провайдера -> deque timestamp'ов запросов
         self._rpm_window: dict[str, collections.deque] = collections.defaultdict(collections.deque)
 
     async def connect(self) -> None:
@@ -124,7 +124,7 @@ class ProviderStore:
             p.error_streak += 1
             if p.error_streak >= _OPEN_THRESHOLD:
                 p.healthy = False
-                # cooldown удваивается с каждым новым открытием: 60 → 120 → 240 → 480 (cap 600)
+                # cooldown удваивается с каждым новым открытием: 60 -> 120 -> 240 -> 480 (cap 600)
                 multiplier = 2 ** (p.error_streak - _OPEN_THRESHOLD)
                 cooldown = min(_BASE_COOLDOWN_S * multiplier, 600.0)
                 p.cooldown_until = time.time() + cooldown
