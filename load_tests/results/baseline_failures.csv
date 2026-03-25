@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+POST,POST /v1/chat/completions [stream],CatchResponseError('Stream returned 0 chunks'),1

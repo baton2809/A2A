@@ -1,0 +1,163 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./infra/otel/config.yaml:/etc/otel/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+      - "13133:13133"
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports: ["9090:9090"]
+    depends_on: [otel-collector]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/grafana/provisioning/dashboards/gateway.json:/var/lib/grafana/dashboards/gateway.json
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.0
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5050
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports: ["5050:5050"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Mock LLM providers — имитируют разные модели с разными задержками
+  mock-fast:
+    build:
+      context: ./mock_llm
+    environment:
+      - PROVIDER_NAME=mock-fast
+      - LATENCY_MS=60
+      - PORT=9000
+    ports: ["9001:9000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mock-slow:
+    build:
+      context: ./mock_llm
+    environment:
+      - PROVIDER_NAME=mock-slow
+      - LATENCY_MS=350
+      - PORT=9000
+    ports: ["9002:9000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  gateway:
+    build:
+      context: ./gateway
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OTEL_ENDPOINT=http://otel-collector:4317
+      - PROVIDERS=mock-fast:http://mock-fast:9000:1,mock-slow:http://mock-slow:9000:1
+      - LOG_LEVEL=INFO
+      - JWT_SECRET_KEY=itmo-gateway-secret-2024
+      - JWT_EXPIRE_MINUTES=60
+      - MLFLOW_TRACKING_URI=http://mlflow:5050
+    ports: ["8080:8080"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_healthy
+      mock-fast:
+        condition: service_healthy
+      mock-slow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agent-registry:
+    build:
+      context: ./agent_registry
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports: ["8010:8010"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  purple-agent:
+    build:
+      context: ./purple-agent
+    environment:
+      - GATEWAY_URL=http://gateway:8080
+      - GATEWAY_USER=admin
+      - GATEWAY_PASS=admin
+      - LLM_MODEL=gpt-4o
+      - REDIS_URL=redis://redis:6379
+    ports: ["8020:8000"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
